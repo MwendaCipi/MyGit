@@ -1,23 +1,66 @@
 import wx
-import wx.aui
+import wx.aui as aui
 import wx.adv  # For wx.DatePickerCtrl
 import wx.lib.mixins.listctrl  # For CheckListCtrlMixin, if needed
 import sqlite3
 from datetime import datetime
 from datetime import date
 import wx.dataview as dv
+      
+class LoginDialog(wx.Dialog):
+    def __init__(self, parent):
+        super(LoginDialog, self).__init__(parent, title="Clinix Login", size=(400, 400))
+        sizer = wx.BoxSizer(wx.VERTICAL)
 
+        font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        
+        # Username and Password Fields
+        username_label = wx.StaticText(self, label="Username:")
+        username_label.SetFont(font)  # Set the font for the label
+        sizer.Add(username_label, 0, wx.ALL, 10)
+        
+        self.username = wx.TextCtrl(self)
+        self.username.SetFont(font)  # Set the font for the TextCtrl
+        sizer.Add(self.username, 0, wx.ALL | wx.EXPAND, 25)
+        
+        # Password Label and TextCtrl
+        password_label = wx.StaticText(self, label="Password:")
+        password_label.SetFont(font)  # Set the font for the label
+        sizer.Add(password_label, 0, wx.ALL, 10)
+        
+        self.password = wx.TextCtrl(self, style=wx.TE_PASSWORD)
+        self.password.SetFont(font)  # Set the font for the TextCtrl
+        sizer.Add(self.password, 0, wx.ALL | wx.EXPAND, 25)
+        
+        # Login Button
+        login_button = wx.Button(self, label="Login")
+        login_button.SetFont(font)
+        sizer.Add(login_button, 0, wx.ALL | wx.ALIGN_CENTER, 5)
+        login_button.Bind(wx.EVT_BUTTON, self.OnLogin)
+        
+        self.SetSizer(sizer)
+        self.Layout()
+
+    def OnLogin(self, event):
        
+        self.EndModal(wx.ID_OK)
+        # Otherwise, you can show an error message
+        # wx.MessageBox("Login Failed", "Error", wx.OK | wx.ICON_ERROR)
+
 class AppointmentApp(wx.App):
     def OnInit(self):
-        frame = MainFrame()
-        frame.Show(True)
-        return True
-        
+        login_dialog = LoginDialog(None)
+        login_dialog.Center()
+        if login_dialog.ShowModal() == wx.ID_OK:
+            frame = MainFrame()
+            frame.Show(True)
+            return True
+        else:
+            return False  # Prevents the app from continuing if login fails
     
 class MainFrame(wx.Frame):
     def __init__(self):
-        super(MainFrame, self).__init__(None, title="ClinicPro Appointment Booking System")
+        super(MainFrame, self).__init__(None, title="Clinix Clinic Management System")
         self.Maximize(True)
         self.SetBackgroundColour('#F0F0F0')
         self.panel = wx.Panel(self)
@@ -25,15 +68,16 @@ class MainFrame(wx.Frame):
         self.initStatusBar()
         self.statusBar.SetBackgroundColour('#2B2B2B)')
         self.notebook = wx.aui.AuiNotebook(self.panel)
-        
-        # Initialize Login Screen
-        self.login_tab = LoginScreen(self.notebook, self)
-        self.notebook.AddPage(self.login_tab, "Login")
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.sizer.Add(self.statusBar, 0, wx.ALL|wx.EXPAND, 5)
         self.sizer.Add(self.notebook, 1, wx.ALL|wx.EXPAND, 5)
         self.panel.SetSizer(self.sizer)
+
+          # Add the Home tab, now passing 'self' as the main_frame reference
+        self.home_tab = BookAppointments(self.notebook, self)  # 'self' is the MainFrame instance
+        self.notebook.AddPage(self.home_tab, "Book Appointments")
+        self.notebook.Bind(aui.EVT_AUINOTEBOOK_PAGE_CLOSE, self.on_tab_close)
 
     def initStatusBar(self):
         self.statusBar = wx.Panel(self.panel)
@@ -74,80 +118,11 @@ class MainFrame(wx.Frame):
             self.notebook.AddPage(new_tab, tab_name)
             self.notebook.SetSelection(self.notebook.GetPageCount() - 1)
 
-    def successful_login(self):
-        # Remove the login tab
-        self.notebook.DeletePage(0)
-        
-        # Add the Home tab, now passing 'self' as the main_frame reference
-        home_tab = HomeScreen(self.notebook, self)  # 'self' is the MainFrame instance
-        self.notebook.AddPage(home_tab, "Home")
-
-
-class LoginScreen(wx.Panel):
-    def __init__(self, parent, main_frame):
-        super(LoginScreen, self).__init__(parent)
-        self.main_frame = main_frame
-        
-        # Username Field
-        wx.StaticText(self, label="Username:", pos=(10, 10))
-        self.username = wx.TextCtrl(self, pos=(110, 10), size=(200, -1))
-        
-        # Password Field
-        wx.StaticText(self, label="Password:", pos=(10, 50))
-        self.password = wx.TextCtrl(self, pos=(110, 50), size=(200, -1), style=wx.TE_PASSWORD)
-        
-        # Login Button
-        login_button = wx.Button(self, label="Login", pos=(110, 100))
-        login_button.Bind(wx.EVT_BUTTON, self.on_login_click)
-        
-    def on_login_click(self, event):
-      
-        self.main_frame.successful_login()
-
-class HomeScreen(wx.Panel):
-    def __init__(self, parent, main_frame):
-        super(HomeScreen, self).__init__(parent)
-        self.main_frame = main_frame  # Store the reference to the main frame
-        self.SetBackgroundColour('#F0F0F0')
-        # Layout for buttons
-        layout = wx.BoxSizer(wx.VERTICAL)
-        
-        # Welcome text
-        welcome_text = wx.StaticText(self, label="Welcome to the ClinicPro Homescreen!")
-        layout.Add(welcome_text, 0, wx.ALL|wx.CENTER, 5)
-        
-        # Book Appointments Button
-        book_page_button = wx.Button(self, label="Book Appointments")
-        book_page_button.Bind(wx.EVT_BUTTON, self.on_book_click)
-        layout.Add(book_page_button, 0, wx.ALL|wx.CENTER, 5)
-        
-        # See Appointments Button
-        see_button = wx.Button(self, label="View Appointments")
-        see_button.Bind(wx.EVT_BUTTON, self.on_see_click)
-        layout.Add(see_button, 0, wx.ALL|wx.CENTER, 5)
-        
-        self.SetSizer(layout)
-        
-        # Menubar
-        menubar = wx.MenuBar()
-        
-        # Manage Menu
-        manage_menu = wx.Menu()
-        manage_item = manage_menu.Append(wx.ID_ANY, "Manage", "Manage Appointments")
-        self.Bind(wx.EVT_MENU, self.on_manage_click, manage_item)
-        
-        menubar.Append(manage_menu, "Manage")
-        
-        self.main_frame.SetMenuBar(menubar)  # Set the menubar on the main frame directly
-
-    def on_book_click(self, event):
-        self.main_frame.open_or_select_tab("Book Appointments", BookAppointments)
-    
-    def on_see_click(self, event):
-        wx.MessageBox("There's nothing to see here")
-    
-    def on_manage_click(self, event):
-        pass
+    def on_tab_close(self, event):
+        # Check if the tab being closed is the Home tab
+        if self.notebook.GetPage(event.GetSelection()) == self.home_tab:
+            # Veto the event to prevent the tab from closing
+            event.Veto()
 
 class AppointmentsModel(dv.PyDataViewModel):
     def __init__(self, data=None):
@@ -339,6 +314,16 @@ class BookAppointments(wx.Panel):
         # Panel for the DataViewCtrl (right)
         self.dvcPanel = wx.Panel(splitter)
 
+        # Menubar
+        menubar = wx.MenuBar()
+        # Manage Menu
+        manage_menu = wx.Menu()
+        manage_item = manage_menu.Append(wx.ID_ANY, "Manage", "Manage Appointments")
+        self.Bind(wx.EVT_MENU, self.onManageClick, manage_item)
+        menubar.Append(manage_menu, "Manage")
+        self.main_frame.SetMenuBar(menubar)  # Set the menubar on the main frame directly
+
+
         self.dataViewCtrl()
         self.expandAllNodes()
 
@@ -358,6 +343,23 @@ class BookAppointments(wx.Panel):
         self.SetSizer(sizer)
 
         self.clinicLastRowid = {}
+
+        self.exclusions = {
+                "01/01": "New Year's Day",
+                "01/05": "Labour Day",
+                "01/06": "Madaraka Day",
+                "10/10": "Huduma Day",
+                "20/10": "Mashujaa Day",
+                "12/12": "Jamhuri Day",
+                "25/12": "Christmas Day",
+                "26/12": "Boxing Day",
+                "31/12": "New Year's Eve"
+            }
+        
+        self.selected_date_str = None
+
+    def onManageClick(self, event):
+        pass
 
     def adjustSashPosition(self, splitter):
         # Set sash position based on the current size
@@ -381,7 +383,7 @@ class BookAppointments(wx.Panel):
         
         self.entries = {}
         fields = ["CLINIC","CLINIC NUMBER", "FIRST NAME", "LAST NAME",  "PHONE NUMBER", "GENDER",
-                   "DATE", "TIME", "COMMENTS"]
+                   "DATE", "TIME"]
         clinics = ["DOPC", "GOPC", "HOPC", "SOPC", "MOPC"]
         genders = ["Male", "Female", "Other"]
 
@@ -471,9 +473,9 @@ class BookAppointments(wx.Panel):
 
         # Bind the buttons to their event handlers
         self.reset_button.Bind(wx.EVT_BUTTON, lambda evt: self.onResetClick(parent, evt))
-        self.edit_button.Bind(wx.EVT_BUTTON, self.onEdit)
+        self.edit_button.Bind(wx.EVT_BUTTON, self.onEditClick)
         self.book_button.Bind(wx.EVT_BUTTON, self.submitForm)
-        self.search_button.Bind(wx.EVT_BUTTON, self.onClickSearch)
+        self.search_button.Bind(wx.EVT_BUTTON, self.onSearchClick)
 
         self.edit_button.Disable()
 
@@ -619,7 +621,6 @@ class BookAppointments(wx.Panel):
             if time_dt.ParseTime(time_str):
                 self.entries['TIME'].SetValue(time_dt)
                         
-            self.entries['COMMENTS'].SetValue(self.item_data['Comments'])
 
     def onRightClick(self, event):
         menu = wx.Menu()
@@ -684,26 +685,26 @@ class BookAppointments(wx.Panel):
                 
                 # Convert the date string to a datetime object to extract year and month
                 date_obj = datetime.strptime(date, "%Y-%m-%d")
-                month_year = date_obj.strftime("%B %Y")  # Format as "Month Year", e.g., "March 2023"
-                date_formatted = date_obj.strftime("%d/%m/%Y")  # Format date as "dd/mm/yyyy"
+                self.month_year = date_obj.strftime("%B %Y")  # Format as "Month Year", e.g., "March 2023"
+                self.date_formatted = date_obj.strftime("%d/%m/%Y")  # Format date as "dd/mm/yyyy"
   
                 # Check if the month_year is already a key in the data dictionary
-                if month_year not in self.data:
-                    self.data[month_year] = {}  # Initialize a new dict for this month_year if not present
+                if self.month_year not in self.data:
+                    self.data[self.month_year] = {}  # Initialize a new dict for this month_year if not present
                 
                 # Check if the date is already a key under the month_year
-                if date_formatted not in self.data[month_year]:
-                    self.data[month_year][date_formatted] = []  # Initialize a new list for this date if not present
+                if self.date_formatted not in self.data[self.month_year]:
+                    self.data[self.month_year][self.date_formatted] = []  # Initialize a new list for this date if not present
                 
                 # Append a dictionary of the booking details to the list associated with the date under the month_year
-                self.data[month_year][date_formatted].append({
+                self.data[self.month_year][self.date_formatted].append({
                     'Clinic': clinic,
                     'ClinicNumber': clinic_number,
                     'FirstName': first_name,
                     'LastName': last_name,
                     'Gender': gender,
                     'PhoneNumber': phone_number,
-                    'Date': date_formatted,
+                    'Date': self.date_formatted,
                     'Time': time,
                     'Comments': comments,
                     'Rowid': rowid
@@ -733,10 +734,11 @@ class BookAppointments(wx.Panel):
                 self.entries["DATE"].SetValue(wx.DefaultDateTime)
 
         self.updateModel(self.data)
+        self.edit_button.Disable()
         self.expandAllNodes()
         self.entries['CLINIC NUMBER'].SetFocus()
 
-    def onClickSearch(self, event):
+    def onSearchClick(self, event):
         self.search_data = {}
         conn = sqlite3.connect('appointments.db')
         cursor = conn.cursor()
@@ -750,18 +752,50 @@ class BookAppointments(wx.Panel):
         gender = self.entries['GENDER'].GetValue()
 
         if clinicnumber or firstname or lastname or phonenumber or searchdate or gender:
+                # Start with the base query
+            query_parts = ["SELECT Clinic, ClinicNumber, FirstName, LastName, PhoneNumber, Gender, Date, Time, Comments, ROWID as Rowid FROM bookings"]
+            conditions = []
+            params = {}
+
+            # Add conditions dynamically based on provided values
+            if clinicnumber:
+                conditions.append("ClinicNumber = :clinicnumber")
+                params['clinicnumber'] = clinicnumber
+
+            if firstname:
+                conditions.append("FirstName LIKE :firstname")
+                params['firstname'] = '%' + firstname + '%'
+
+            if lastname:
+                conditions.append("LastName LIKE :lastname")
+                params['lastname'] = '%' + lastname + '%'
+
+            if phonenumber:
+                conditions.append("PhoneNumber = :phonenumber")
+                params['phonenumber'] = phonenumber
+
+            if searchdate:
+                conditions.append("Date = :searchdate")
+                params['searchdate'] = searchdate
+
+            if gender:
+                conditions.append("Gender = :gender")
+                params['gender'] = gender
+
+            # Only add a WHERE clause if there are conditions
+            if conditions:
+                query_parts.append("WHERE " + " AND ".join(conditions))
+
+            # Always add the order by clause
+            query_parts.append("ORDER BY Date")
+
+            # Join the parts to form the final query
+            query = " ".join(query_parts)
+
+            # Execute the query
             try:
-                cursor.execute('''SELECT Clinic, ClinicNumber, FirstName,
-                                LastName, PhoneNumber, Gender, Date, Time, Comments, ROWID as Rowid
-                                FROM bookings 
-                            WHERE ClinicNumber = :clinicnumber OR
-                            FirstName = :firstname OR LastName = :lastname 
-                            OR PhoneNumber= :phonenumber OR 
-                            Gender= :gender OR Date= :searchdate 
-                            ORDER BY Date''', {'clinicnumber': clinicnumber, 'firstname': firstname, 
-                                                'lastname': lastname, 'phonenumber': phonenumber,
-                                                'gender': gender, 'searchdate': searchdate})
-                
+                cursor.execute(query, params)
+
                 bookings = cursor.fetchall()
 
                 if bookings:
@@ -798,23 +832,28 @@ class BookAppointments(wx.Panel):
                         })
 
                     self.updateModel(self.search_data)
+                    self.edit_button.Disable()
+                    self.entries['CLINIC NUMBER'].SetFocus()
                     self.expandAllNodes()
 
                 else:
-                    wx.MessageBox("There is nothing to show for that search")
+                    wx.MessageBox("There is nothing to show for that search; please try a different one")
+                    self.entries['CLINIC NUMBER'].SetFocus()
                     return
 
             except sqlite3.Error as e:
                 wx.MessageBox(f"Failed to load appointments: {e}", "Database Error", wx.OK | wx.ICON_ERROR)
+                return
             finally:
                 conn.close()
 
         else:
             wx.MessageBox("No search item entered: please enter an item and try again")
+            self.entries['CLINIC NUMBER'].SetFocus()
             return
 
 
-    def onEdit(self, event):
+    def onEditClick(self, event):
         self.prepareData()
         self.update_performed = False
 
@@ -826,11 +865,10 @@ class BookAppointments(wx.Panel):
                 'gender': self.entries['GENDER'].GetValue(),
                 'phone_number': self.entries["PHONE NUMBER"].GetValue().strip(),
                 'date': self.iso_date,
-                'time': self.iso_time,
-                'comments': self.entries['COMMENTS'].GetValue().strip(),
+                'time': self.iso_time
             }
         
-        validation_result = self.validate_data(data)
+        validation_result = self.validate_edit(data)
         if validation_result is not None:
             dialog = wx.MessageDialog(self, validation_result, "Validation Error", wx.OK | wx.ICON_ERROR)
             dialog.ShowModal()
@@ -843,65 +881,86 @@ class BookAppointments(wx.Panel):
         python_date = datetime.strptime(current_date, '%d/%m/%Y').date() 
         #ISO format
         current_date = python_date.isoformat()  
-  
+
         conn = sqlite3.connect('appointments.db')
         cursor = conn.cursor()
 
-        if (self.item_data['Clinic'] != data['clinic'] or 
-            self.item_data['ClinicNumber'] != data['clinic_number'] or
-            self.item_date != self.entries['DATE'].GetValue()):
+        sql = '''SELECT Clinic, ClinicNumber, Date from bookings 
+        WHERE Clinic = :current_clinic 
+        AND ClinicNumber = :current_clinic_number 
+        AND Date = :current_date'''
+        params = {'current_clinic': current_clinic, 
+                'current_clinic_number': current_clinic_number,
+                'current_date': current_date}
+                            
+        cursor.execute(sql, params)
+        result = cursor.fetchall()
 
-            with conn:
-                sql = '''UPDATE bookings
-                        SET Clinic = :clinic,
-                        ClinicNumber = :clinic_number,
-                        Date = :date 
-                    WHERE Clinic = :current_clinic 
-                    AND ClinicNumber = :current_clinic_number 
-                    AND Date = :current_date'''
-                params = {'clinic': data['clinic'], 'clinic_number': data['clinic_number'],
-                        'date': data['date'], 'current_clinic': current_clinic, 
-                        'current_clinic_number': current_clinic_number,
-                        'current_date': current_date}
-                
-                cursor.execute(sql, params)
-                self.update_performed = True
-
-        if (self.item_data['FirstName'] != data['first_name'] or
-            self.item_data['LastName'] != data['last_name'] or
-            self.item_data['PhoneNumber'] != data['phone_number'] or
-            self.item_data['Gender'] != data['gender'] or
-            self.item_data['Time']!= data['time'] or
-            self.item_data['Comments'] != data['comments']
-            ):
-        
-            with conn:
-                sql = '''UPDATE bookings
-                        SET FirstName= :first_name,
-                        LastName= :last_name,
-                        PhoneNumber= :phone_number,
-                        Gender= :gender, 
-                        Time= :time,     
-                        Comments= :comments
-                    WHERE Clinic= :clinic AND ClinicNumber = :clinic_number
-                    AND Date= :date
-                        '''
-                cursor.execute(sql, data)
-
-                self.update_performed = True
-
+        if result:
     
-        if self.update_performed:
-                self.message = "Appointment edited successfully"
-                self.onResetClick(self.formPanel)
-                self.onEditSuccessful()    
-                self.book_button.Enable()
+            if (self.item_data['Clinic'] != data['clinic'] or 
+                self.item_data['ClinicNumber'] != data['clinic_number'] or
+                self.item_date != self.entries['DATE'].GetValue()):
+
+                with conn:
+                    sql = '''UPDATE bookings
+                            SET Clinic = :clinic,
+                            ClinicNumber = :clinic_number,
+                            Date = :date 
+                        WHERE Clinic = :current_clinic 
+                        AND ClinicNumber = :current_clinic_number 
+                        AND Date = :current_date'''
+                    params = {'clinic': data['clinic'], 'clinic_number': data['clinic_number'],
+                            'date': data['date'], 'current_clinic': current_clinic, 
+                            'current_clinic_number': current_clinic_number,
+                            'current_date': current_date}
+                    
+                    cursor.execute(sql, params)
+                    self.update_performed = True
+
+            if (self.item_data['FirstName'] != data['first_name'] or
+                self.item_data['LastName'] != data['last_name'] or
+                self.item_data['PhoneNumber'] != data['phone_number'] or
+                self.item_data['Gender'] != data['gender'] or
+                self.item_data['Time']!= data['time']
+                ):
+            
+                with conn:
+                    sql = '''UPDATE bookings
+                            SET FirstName= :first_name,
+                            LastName= :last_name,
+                            PhoneNumber= :phone_number,
+                            Gender= :gender, 
+                            Time= :time
+                        WHERE Clinic= :clinic AND ClinicNumber = :clinic_number
+                        AND Date= :date
+                            '''
+                    cursor.execute(sql, data)
+
+                    self.update_performed = True
+        else:
+            response = wx.MessageBox("Edit not done: The selected item might have been deleted. Rebook instead?",
+                           "Edit dichotomy", style = wx.ICON_ERROR | wx.YES_NO | wx.YES_DEFAULT)
+            if response == wx.YES:
                 self.edit_button.Disable()
+                self.book_button.Enable()
+                self.book_button.SetFocus()
+            else:
+                self.onResetClick()
+            return
+                
+        if self.update_performed:
+            self.message = "Appointment edited successfully"
+            self.onResetClick(self.formPanel)
+            self.onEditSuccessful()    
+            self.book_button.Enable()
+            self.edit_button.Disable()
+
         else:
             edit_dialog = wx.MessageDialog(None, 
                             "You didn't make any changes to the selected data: Exit editing?", 
                             "No changes made",
-                             wx.OK | wx.CANCEL | wx.CANCEL_DEFAULT | wx.ICON_INFORMATION)
+                            wx.OK | wx.CANCEL | wx.CANCEL_DEFAULT | wx.ICON_INFORMATION)
             
             # Show the dialog and check the response
             edit_response = edit_dialog.ShowModal()
@@ -921,7 +980,7 @@ class BookAppointments(wx.Panel):
             self.dvc.Select(item)
 
         conn.close()
-        
+
     def onEditSuccessful(self):
             self.main_frame.setStatus(self.message)
             self.loadAppointments()
@@ -929,9 +988,7 @@ class BookAppointments(wx.Panel):
             self.expandAllNodes()
 
     def submitForm(self, event):
-        
         self.prepareData()
-
         data = {
                 'clinic': self.entries['CLINIC'].GetValue(),
                 'clinic_number': self.entries['CLINIC NUMBER'].GetValue().strip(),
@@ -941,71 +998,207 @@ class BookAppointments(wx.Panel):
                 'phone_number': self.entries["PHONE NUMBER"].GetValue().strip(),
                 'date': self.iso_date,
                 'time': self.iso_time,
-                'comments': self.entries['COMMENTS'].GetValue().strip()
             }
             
-        if data['clinic_number'] and data ['date']:
-            self.book_button.Enable()
-            validation_result = self.validate_data(data)
-            if validation_result is not None:
-                dialog = wx.MessageDialog(self, validation_result, "Validation Error", wx.OK | wx.ICON_ERROR)
-                dialog.ShowModal()
-                dialog.Destroy()
-
-                return
+        self.check_duplication(data)
+        validation_result = self.validate_booking(data)
+        if validation_result is not None:
+            dialog = wx.MessageDialog(self, validation_result, "Validation Error", wx.OK | wx.ICON_ERROR)
+            dialog.ShowModal()
+            dialog.Destroy()
+            return 
         
-            conn = sqlite3.connect('appointments.db')
-            cursor = conn.cursor()
+        conn = sqlite3.connect('appointments.db')
+        cursor = conn.cursor()
 
-            try:
-                with conn: # Using the connection as a context manager to auto-commit/rollback
-                        sql = '''INSERT INTO bookings(Clinic, ClinicNumber, FirstName, LastName, PhoneNumber,
-                                 Gender, Date, Time, Comments)
-                                VALUES(:clinic, :clinic_number, :first_name, :last_name, :phone_number, :gender,
-                                :date, :time, :comments)'''
-
-        
-                cursor.execute(sql, data)
-                conn.commit() 
-                
-                message = "Successfully booked!"
-                
-                self.loadAppointments()
-                self.updateModel(self.data)
-                self.expandAllNodes()
-
-                self.rowid = cursor.lastrowid
-                try:
-                    current_rowid = self.rowid
-                    item = self.model.getItemByRowid(current_rowid)
-                    if item and item.IsOk():
-                        self.dvc.Select(item)
-                        self.dvc.EnsureVisible(item)
-                    else:
-                        print("The item is either None or not valid.")
-                except Exception as e:
-                    print(f"An error occurred: {e}")
-
-
-                self.clinicLastRowid[data['clinic']] = cursor.lastrowid
-                print(self.clinicLastRowid)
-
-                self.main_frame.setStatus(message)
-                #wx.MessageBox(f"TCA {data['date']}, {data['time']}, {data['clinic']}")
-
-            except sqlite3.IntegrityError:
-             wx.MessageBox("Failed to book: Appointment already exists!", "Error", wx.OK | wx.ICON_ERROR)
-            finally:
-                conn.close()
+        try:
+            with conn: # Using the connection as a context manager to auto-commit/rollback
+                    sql = '''INSERT INTO bookings(Clinic, ClinicNumber, FirstName, LastName, PhoneNumber,
+                                Gender, Date, Time)
+                            VALUES(:clinic, :clinic_number, :first_name, :last_name, :phone_number, :gender,
+                            :date, :time)'''
 
     
-    def validate_data(self, data):
+            cursor.execute(sql, data)
+            conn.commit() 
+            
+            message = "Successfully booked!"
+            
+            self.loadAppointments()
+            self.updateModel(self.data)
+            self.expandAllNodes()
+
+            self.rowid = cursor.lastrowid
+            try:
+                current_rowid = self.rowid
+                item = self.model.getItemByRowid(current_rowid)
+                if item and item.IsOk():
+                    self.dvc.Select(item)
+                    self.dvc.EnsureVisible(item)
+                else:
+                    print("The item is either None or not valid.")
+            except Exception as e:
+                print(f"An error occurred: {e}")
+
+
+            self.clinicLastRowid[data['clinic']] = cursor.lastrowid
+        
+
+            self.main_frame.setStatus(message)
+            #wx.MessageBox(f"TCA {data['date']}, {data['time']}, {data['clinic']}")
+
+        except sqlite3.IntegrityError:
+            wx.MessageBox("Failed to book: The patient already has an appointment on the selected date!", "Error", wx.OK | wx.ICON_ERROR)
+        finally:
+            conn.close()
+        self.entries['CLINIC NUMBER'].SetFocus()
+
+
+    def validate_booking(self, data):
         validation_data = data
         current_date = datetime.now().date() #date component only, ignore time as it considers only midnight as valid
         #since string date cannot be compared to a datetime object, convert
         input_date_str = validation_data['date']
         input_date = datetime.strptime(input_date_str, '%Y-%m-%d').date()
-    # Clinic Number: Must be an integer and not empty
+    
+        try:
+            clinic_number = int(validation_data['clinic_number'])
+            if clinic_number < 0: 
+                return "Clinic number must be a positive number."
+        except ValueError:
+            return "Clinic number should be entered as numbers!"
+        
+        if len(validation_data['clinic_number']) < 6:
+                self.entries['CLINIC NUMBER'].SetFocus()
+                return "Clinic number must be 6 numbers"
+
+        # First Name and Last Name: Cannot be null (empty)
+        if not validation_data['first_name']:
+            self.entries['FIRST NAME'].SetFocus()
+            return "First name cannot be empty."
+        if not validation_data['last_name']:
+            self.entries['LAST NAME'].SetFocus()
+            return "Last name cannot be empty."
+
+        # Validation of phone numbers
+        if not validation_data['phone_number']:
+            self.entries['PHONE NUMBER'].SetFocus()
+            return "Supply patient's or next of kin's phone number."
+        if not (validation_data['phone_number'].isdigit()):
+                self.entries['PHONE NUMBER'].SetFocus()
+                return "Phone number must be 10 digits!"
+        if not len(validation_data['phone_number'])==10:
+                self.entries['PHONE NUMBER'].SetFocus()
+                return "Phone number must be 10 digits"
+
+        if not (validation_data['gender']):
+            self.entries['GENDER'].SetFocus()
+            return "Patient's gender is required"
+
+        # Clinic: Must also be filled
+        if not validation_data['clinic']:
+            self.entries['CLINIC'].SetFocus()
+            return "Clinic must be selected."
+
+        if validation_data['clinic'] == 'GOPC' and validation_data['gender'] == 'Male':
+            self.entries['GENDER'].SetFocus()
+            return "Male patients cannot be booked for GOPC! Please confirm correct gender and/or clinic selection"
+        
+        if not validation_data['date']:
+            self.entries['DATE'].SetFocus()
+            return "Appointment date must be selected"
+        if input_date < current_date: #date component only, ignore time as it considers only midnight as valid
+            return "You cannot book an appointment on a past date; please select a current or future one!"
+          
+        selected_date = self.entries['DATE'].GetValue()
+        self.date_month = selected_date.Format('%d/%m')
+        date_str = selected_date.Format("%a %d %B %Y") #%a for abbreviated day-of-week, %A for full
+
+        if self.date_month in self.exclusions:
+            self.selected_date_str = date_str
+
+        if self.selected_date_str:
+            decision = wx.MessageBox(f"{self.selected_date_str}: {self.exclusions[self.date_month]}. Continue booking anyway?",
+                                        "Excluded Date",
+                                        style= wx.ICON_WARNING | wx.YES_NO | wx.NO_DEFAULT)
+            if decision == wx.YES:
+                self.selected_date_str = None
+                pass
+            else: 
+                self.selected_date_str = None
+            return
+                
+        # If all validations pass
+        return None
+    
+    def check_duplication(self, data):
+        data = data
+        # Traverse through the month-year and date hierarchy
+        for month_year, dates in self.data.items():
+            for date, appointments in dates.items():
+                for appointment in appointments:
+                    if (appointment['Clinic'] == data['clinic'] and 
+                        appointment['ClinicNumber'] == data['clinic_number']):
+                        # Found a conflicting appointment
+                        self.entries['CLINIC NUMBER'].SetFocus()
+                        booked_date = self.model.convert_yyyy_mm_dd_to_dd_mm_yyyy(date)  
+                        reaction = wx.MessageBox(f"Clinic number {data['clinic_number']} has an unhonored {data['clinic']} appointment on {booked_date}. Edit it instead?", 
+                                                 "Appointment Exists", style = wx.ICON_ERROR | wx.YES_NO | wx.YES_DEFAULT)
+                        if reaction == wx.YES:
+                            conn = sqlite3.connect('appointments.db')
+                            cursor = conn.cursor()
+                            this_clinic = appointment['Clinic']
+                            this_clinic_number = appointment['ClinicNumber']
+                            this_date = appointment['Date']
+                            this_date = self.model.convert_dd_mm_yyyy_to_yyyy_mm_dd(this_date)
+
+                            cursor.execute('''SELECT ROWID as Rowid
+                                            FROM bookings WHERE Clinic = :this_clinic
+                                           AND ClinicNumber = :this_clinic_number AND Date = :this_date ORDER BY Date''',
+                                            {'this_clinic': this_clinic,
+                                             'this_clinic_number': this_clinic_number,
+                                             'this_date': this_date})
+                            this_rowid = cursor.fetchone()
+                            
+                            if this_rowid:
+                                this_rowid = this_rowid[0]
+                                print(this_rowid)
+                                item = self.model.getItemByRowid(this_rowid)
+                                self.dvc.EnsureVisible(item)
+                                self.dvc.Select(item)
+
+                            return
+
+                        else:
+                            self.entries['CLINIC NUMBER'].SetFocus()
+                        return
+                                     
+
+    def validate_edit(self, data):
+        selected_date = self.entries['DATE'].GetValue()
+        self.date_month = selected_date.Format('%d/%m')
+        date_str = selected_date.Format("%a %d %B %Y") #%a for abbreviated day-of-week, %A for full
+
+        if self.date_month in self.exclusions:
+            self.selected_date_str = date_str
+
+        if self.selected_date_str:
+            decision = wx.MessageBox(f"{self.selected_date_str}: {self.exclusions[self.date_month]}. Continue booking anyway?",
+                                        "Excluded Date",
+                                        style= wx.ICON_WARNING | wx.YES_NO | wx.NO_DEFAULT)
+            if decision == wx.YES:
+                self.selected_date_str = None
+                pass
+            else: 
+                self.selected_date_str = None
+            return
+                
+        validation_data = data
+        current_date = datetime.now().date() #date component only, ignore time as it considers only midnight as valid
+        #since string date cannot be compared to a datetime object, convert
+        input_date_str = validation_data['date']
+        input_date = datetime.strptime(input_date_str, '%Y-%m-%d').date()
+    
         try:
             clinic_number = int(validation_data['clinic_number'])
             if clinic_number < 0: 
@@ -1038,7 +1231,7 @@ class BookAppointments(wx.Panel):
             return "Clinic must be selected."
 
         if validation_data['clinic'] == 'GOPC' and validation_data['gender'] == 'Male':
-            return "Male patients cannot be booked for GOPC!"
+            return "Male patients cannot be booked for GOPC! Please confirm correct gender and/or clinic selection"
         
         if not validation_data['date']:
             return "Appointment date must be selected"
