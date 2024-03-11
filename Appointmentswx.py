@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime
 from datetime import date
 import wx.dataview as dv
+import wx.lib.agw.aui
       
 class LoginDialog(wx.Dialog):
     def __init__(self, parent):
@@ -13,6 +14,8 @@ class LoginDialog(wx.Dialog):
         sizer = wx.BoxSizer(wx.VERTICAL)
 
         font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+    
+        #self.SetForegroundColour('#6g7b5g')
         
         # Username and Password Fields
         username_label = wx.StaticText(self, label="Username:")
@@ -62,13 +65,14 @@ class MainFrame(wx.Frame):
     def __init__(self):
         super(MainFrame, self).__init__(None, title="Clinix Clinic Management System")
         self.Maximize(True)
-        self.SetBackgroundColour('#F0F0F0')
+        self.SetBackgroundColour('#C5C5C5')
         self.panel = wx.Panel(self)
 
         self.initStatusBar()
-        self.statusBar.SetBackgroundColour('#2B2B2B)')
-        self.notebook = wx.aui.AuiNotebook(self.panel)
+        self.statusBar.SetBackgroundColour('#F9F7F7')
 
+        self.notebook = wx.aui.AuiNotebook(self.panel)
+       
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.sizer.Add(self.statusBar, 0, wx.ALL|wx.EXPAND, 5)
         self.sizer.Add(self.notebook, 1, wx.ALL|wx.EXPAND, 5)
@@ -308,11 +312,13 @@ class BookAppointments(wx.Panel):
         
         # Panel for the form fields (left)
         self.formPanel = wx.Panel(splitter)
-        self.formPanel.SetBackgroundColour('#F0F0F0')
+        self.formPanel.SetBackgroundColour('#E7E7F7')
+        #self.formPanel.SetBackgroundColour('#D7D7F7')
         self.setupFormFields(self.formPanel)
         
         # Panel for the DataViewCtrl (right)
         self.dvcPanel = wx.Panel(splitter)
+        self.dvcPanel.SetBackgroundColour('#C5C5C5')
 
         # Menubar
         menubar = wx.MenuBar()
@@ -592,9 +598,17 @@ class BookAppointments(wx.Panel):
                         self.dvc.Expand(date_item)
 
     def onItemActivated(self, event):
-        self.edit_button.Enable()
-        self.book_button.Disable()
-        item = event.GetItem()
+        
+        # Check if 'event' is the type that would have a 'GetItem' method
+        # This assumes 'event' would be a wx.Event or similar when it's not a direct item
+        if hasattr(event, 'GetItem'):
+            item = event.GetItem()
+            self.edit_button.Enable()
+            self.book_button.Disable()
+        else:
+            # If 'event' itself is the item or 'event' doesn't have 'GetItem',
+            # use 'event' directly as the item
+            item = event
         if item.IsOk():
             self.item_data = self.model.GetItemData(item)  # Retrieve data for the selected item
 
@@ -621,16 +635,34 @@ class BookAppointments(wx.Panel):
             if time_dt.ParseTime(time_str):
                 self.entries['TIME'].SetValue(time_dt)
                         
-
     def onRightClick(self, event):
         menu = wx.Menu()
-        deleteItem = menu.Append(wx.ID_ANY, 'Delete')
-         # Bind the menu item selection event to a method that handles deletion
-        self.Bind(wx.EVT_MENU, self.onDeleteItem, deleteItem)
-           # Show the context menu at the position of the mouse cursor
+
+        add_appointment = menu.Append(wx.ID_ANY, 'Add appointment')
+        edit_appointment = menu.Append(wx.ID_ANY, 'Edit appointment')
+        delete_item = menu.Append(wx.ID_ANY, 'Delete appointment')
+       
+         # Bind the menu item selection events to methods
+        self.Bind(wx.EVT_MENU, self.onDeleteItem, delete_item)
+        self.Bind(wx.EVT_MENU, self.onAddAppointment, add_appointment)
+        self.Bind(wx.EVT_MENU, self.onEditAppointment, edit_appointment)
+
+        # Show the context menu at the position of the mouse cursor
         self.PopupMenu(menu)
         #cleanUp
         menu.Destroy()
+
+    def onAddAppointment(self, event):
+        item = self.dvc.GetSelection()
+        self.edit_button.Disable()
+        self.book_button.Enable()
+        self.onItemActivated(item)
+
+    def onEditAppointment(self, event):
+        item = self.dvc.GetSelection()
+        self.book_button.Disable()
+        self.edit_button.Enable()
+        self.onItemActivated(item)
 
     def onDeleteItem(self, event):
         message = "Appointment deleted from the application!"
@@ -646,13 +678,19 @@ class BookAppointments(wx.Panel):
             # If the object is an appointment (a dictionary in this context)
             if isinstance(obj, dict):
         
-                row_id = obj.get('Rowid')
-                if row_id:
+                clinic = obj.get('Clinic')
+                clinic_number = obj.get('ClinicNumber')
+                date = obj.get('Date')
+
+                if clinic and clinic_number and date:
+                    date = datetime.strptime(date, "%d/%m/%Y")
+                    date = date.strftime("%Y-%m-%d")  
                     try:
                         conn = sqlite3.connect('appointments.db')
                         cursor = conn.cursor()
                         # Delete the appointment from the database using its RowID
-                        cursor.execute("DELETE FROM bookings WHERE RowID = ?", (row_id,))
+                        cursor.execute("DELETE FROM bookings WHERE Clinic = ? AND ClinicNumber = ? \
+                                      AND Date = ?", (clinic, clinic_number, date))
                         conn.commit()
                     except sqlite3.Error as error:
                         wx.MessageBox(f"Failed to delete appointment from the database: {error}", "Database Error", wx.ICON_ERROR)
@@ -663,6 +701,7 @@ class BookAppointments(wx.Panel):
                 self.updateModel(self.data)
                 self.main_frame.setStatus(message, colour)
                 self.expandAllNodes()
+
 
     def loadAppointments(self):
         self.data = {}
@@ -1046,6 +1085,7 @@ class BookAppointments(wx.Panel):
 
             self.main_frame.setStatus(message)
             #wx.MessageBox(f"TCA {data['date']}, {data['time']}, {data['clinic']}")
+            self.onResetClick(self.formPanel)
 
         except sqlite3.IntegrityError:
             wx.MessageBox("Failed to book: The patient already has an appointment on the selected date!", "Error", wx.OK | wx.ICON_ERROR)
